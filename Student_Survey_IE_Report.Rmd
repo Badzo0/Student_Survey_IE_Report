@@ -1,0 +1,716 @@
+---
+title: "General report"
+author: "Author Name"
+date: "5/6/2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#Loads all the required packages
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(readr, tidyverse, ggplot2,fmsb,tidyquant,kableExtra,patchwork,ggpubr,plotly,ggsignif,DT,gganimate, hrbrthemes, gganimate,tidytext,skimr,ggcorrplot,ComplexHeatmap,widyr,stm)
+
+#--------------------------------------------------------------⎮
+#               Paste the path to your dataset below           ⎮
+#--------------------------------------------------------------⎮
+#                                                              ⎮
+RawData <- read_csv("/Volumes/Untitled/ISSE_DATA.csv")#        ⎮
+#                                                              ⎮
+#--------------------------------------------------------------⎮
+
+    percent <- function(x, digits = 1, format = "f", ...) {
+        paste0(formatC(100 * x, format = format, digits = digits, ...), "%")
+    }
+```
+
+## Introduction
+
+StudentSurvey.ie (Irish Survey of StudentEngagement) invites responses from first year undergraduate, final year undergraduate, and
+taught postgraduate students in 27 higher education institutions in Ireland. 
+
+The survey consists of 67 questions, grouped by the engagement indicator to which they relate. Most questions relate to a specific engagement indicator.The scores for each indicator are calculated from responses to the multiple questions that relate to that indicator
+
+## Response rates and demographics 
+
+
+```{r response, echo=FALSE, message=FALSE, warning=FALSE}
+ Response<-RawData %>%
+        select("Year","Study_group","sex","coursecd","HO","RI","QR","LS","CL","SF","ET","QI","SE")%>%
+        group_by(Year, Study_group)%>%
+        summarise("num"=n())%>%
+        spread(Year, num)
+
+resp_num<-RawData %>%
+        select("Year","Study_group","sex","coursecd","HO","RI","QR","LS","CL","SF","ET","QI","SE")%>%
+        group_by(Year, coursecd)%>%
+        summarise("num"=n())%>%
+        spread(Year, num)
+
+resp_num_long<-RawData %>%
+        select("Year","Study_group","sex","coursecd","HO","RI","QR","LS","CL","SF","ET","QI","SE")%>%
+        group_by(Year, coursecd)%>%
+        summarise("num"=n())
+
+
+
+
+```
+
+```{r response_g, echo=FALSE, fig.align="center", fig.height=5, fig.width=10, message=FALSE, warning=FALSE}
+
+     Response_g<-RawData %>%
+        select("Year","Study_group","sex","coursecd","HO","RI","QR","LS","CL","SF","ET","QI","SE")%>%
+        group_by(Year, Study_group)%>%
+        summarise("num"=n())
+
+  
+
+R_a<- ggplot(Response_g) +
+ aes(x = Year, fill = Study_group, weight = num) +
+ geom_bar(position = "dodge") +
+ scale_fill_viridis_d(option = "viridis") +
+ labs(x = "Year", y = "N", title = "Response Numbers by Year") +
+ theme_classic()+theme(legend.position = "none")
+
+
+R_b <- ggplot(Response_g) +
+ aes(x = Year, fill = Study_group, weight = num) +
+ geom_bar(position = "fill") +
+ scale_fill_viridis_d(option = "viridis",name = "") +
+ labs(x = "Year", y = "") + theme_classic()
+
+
+graph_a<-ggplotly(R_a,legendgroup = Study_group, showlegend = F) 
+graph_b<-ggplotly(R_b,legendgroup = Study_group, showlegend = T)%>% layout(legend=list(title=list(text=' Study Group')))
+
+subplot(style(graph_a, showlegend = F),graph_b,   margin = 0.1, shareX =TRUE)
+
+
+
+```
+
+
+
+```{r table1, echo=FALSE, warning=FALSE}
+# Compute descriptive statistics by groups
+stable <- desc_statby(RawData, measure.var = "HO",
+                      grps = c("Year","coursecd"))
+# Summary table
+kable(Response) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"),full_width = F, position = "float_right")
+
+```
+ 
+ 
+&nbsp;
+&nbsp;
+  
+This report focuses mainly on the differences between 1st year (Y1), Final year (YF) and Postgraduate taught (PGT) students. The data collection procedures vary every year. Most commonly stands with students promoting the survey and email promotion are employed. Social media is used more in the past years as well. 
+
+&nbsp;
+&nbsp;
+
+
+```{r numbers, echo=FALSE, message=FALSE, warning=FALSE, fig.align="center",}
+resp_num_long %>%
+ filter(Year >= sort(unique(RawData$Year))[length(unique(RawData$Year))] & Year <= sort(unique(RawData$Year))[length(unique(RawData$Year))]) %>%
+ ggplot() +
+ aes(x = coursecd, fill = coursecd, weight = num) +
+ geom_bar(position = "dodge") +
+ scale_fill_hue() +
+ labs(title = "Number of Responses by Course") +
+ coord_flip() +
+ theme_classic() +
+  theme(legend.position = "none")+
+   scale_fill_viridis_d(option = "viridis") +
+ facet_wrap(vars(Year))+
+  geom_text(stat = "count", aes(label = ..count..), hjust = 0)
+
+```
+
+
+
+```{r Data, echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+
+
+    startData <- RawData  %>% select("Year", "coursecd","HO","RI","QR","LS","CL","SF","ET","QI","SE") 
+    gender<-RawData %>%
+        select("Year","Study_group","sex","coursecd","HO","RI","QR","LS","CL","SF","ET","QI","SE")%>%
+        group_by(Year,sex)%>%
+        filter(sex %in% c(1,2))%>%
+        summarise("num"=n())%>%
+        mutate(perc = (percent(num/sum(num))))%>%
+        pivot_wider(names_from = Year, values_from = c(num, perc))
+
+
+```
+
+
+## Course Comparison `r sort(unique(RawData$Year))[length(unique(RawData$Year))]`
+
+Heatmap comparing course scores on all the indicators:
+
+```{r echo=FALSE, warning=FALSE, fig.align="center", fig.height=7, fig.width=10}
+mat2 <- matrix(runif(100), nrow=20, dimnames=list(LETTERS[1:20], LETTERS[21:25]))
+
+    heatmap<-RawData %>%
+        select("Year","coursecd","HO","RI","QR","LS","CL","SF","ET","QI","SE")%>%
+        group_by(coursecd)%>%
+        filter(Year ==  sort(unique(Year))[length(unique(Year))])%>%
+        summarise_all(funs(mean),na.rm = TRUE)%>%
+        select(-Year)%>%
+        filter_at(vars(-coursecd), all_vars(!is.na(.)))%>%
+        column_to_rownames("coursecd")%>%
+      round(2)
+
+heatmap_mat<-as.matrix(heatmap)
+
+plot_ly(type="heatmap",colors = colorRamp(c("firebrick3","yellow2", "chartreuse4")), x=colnames(heatmap_mat), y=rownames(heatmap_mat), z=heatmap_mat, xgap=1, ygap=1)%>%
+    layout(margin = list(l=120)) 
+
+
+datatable(heatmap_mat, filter = 'none', caption = "Indicator variable scores",rownames = T,
+   options = list(
+    dom = 'Bfrtip',
+    columnDefs = list(list(className = 'dt-center', targets = "_all"))  ))
+
+```
+
+
+## Percent Change from Student Survey 2017 to `r sort(unique(RawData$Year))[length(unique(RawData$Year))]`
+
+This heatmap indicates the changes from the first availible return year to the last return year. 
+
+```{r Percent change, echo=FALSE, warning=FALSE, fig.align="center", fig.height=7, fig.width=10}
+
+    perc_change<-RawData %>%
+        select("Year","coursecd","HO","RI","QR","LS","CL","SF","ET","QI","SE")%>%
+        group_by(coursecd,Year)%>%
+        filter(Year == (sort(unique(RawData$Year))[length(unique(RawData$Year))]) | Year==sort(unique(RawData$Year))[1]  )%>%
+        summarise_at(c("HO","RI","QR","LS","CL","SF","ET","QI","SE"), mean, na.rm = TRUE) %>%     
+        filter_at(vars(-coursecd,Year), all_vars(!is.na(.)))%>%
+pivot_longer(-c(coursecd,Year), names_to = "indicator", values_to = "avg") %>%
+group_by(indicator,coursecd) %>% 
+  arrange(Year, .by_group = TRUE) %>%
+  mutate(pct_change = (avg/lag(avg) - 1) * 100)%>%
+        filter(Year == sort(unique(RawData$Year))[length(unique(RawData$Year))])%>%
+        select(-avg,-Year)%>%
+        filter_at(vars(-coursecd), all_vars(!is.na(.)))%>%
+        pivot_wider(names_from = indicator, values_from = c(pct_change))%>%
+        column_to_rownames("coursecd")%>%
+      round()
+
+heatmap_mat<-as.matrix(perc_change)
+
+plot_ly(type="heatmap", x=colnames(heatmap_mat), y=rownames(heatmap_mat), z=heatmap_mat, xgap=1, ygap=1)%>%
+    layout(margin = list(l=120)) 
+
+
+
+
+```
+
+
+
+## Study mode Comparison Plots
+
+```{r  boxplot, echo=FALSE, fig.height = 7, fig.width = 10, fig.align = "center",warning=FALSE}
+
+     Response_boxplot<-RawData %>%
+        select("Year","Study_group","sex","coursecd","HO","RI","QR","LS","CL","SF","ET","QI","SE")%>%
+        filter(Year==sort(unique(RawData$Year))[length(unique(RawData$Year))], sex==c(1,2))
+
+ggboxplot(Response_boxplot, x = "Study_group",
+          y = c("HO","RI","QR","LS","CL","SF","ET","QI","SE"),
+          combine = TRUE,
+          color = "Study_group", palette = c("#440154ff","#2d6e8eff","#cbe02dff"),
+          ylab = "Indicator", 
+          add = "jitter",                               # Add jittered points
+          add.params = list(size = 1, jitter = 0.2),  # Point size and the amount of jittering
+          #label = "bcr_patient_barcode",                # column containing point labels
+          label.select = list(top.up = 2, top.down = 2),# Select some labels to display
+          font.label = list(size = 9, face = "italic"), # label font
+          repel = TRUE                                  # Avoid label text overplotting
+          )
+
+```
+
+
+
+
+
+```{r BOX_2, echo=FALSE, fig.height = 11, fig.width = 10, fig.align = "center", warning=FALSE}
+
+
+
+HO_p <- ggplot(Response_boxplot, aes(x=Study_group, y=HO)) + 
+  geom_boxplot() +
+  geom_signif(comparisons = list(c("Y1","YF"),c("Y1","PGT"),c("PGT","YF")), map_signif_level=TRUE, y_position = c(65,70, 75))+ theme_classic()
+
+RI_p <- ggplot(Response_boxplot, aes(x=Study_group, y=RI)) + 
+  geom_boxplot() +
+  geom_signif(comparisons = list(c("Y1","YF"),c("Y1","PGT"),c("PGT","YF")), map_signif_level=TRUE, y_position = c(65,70, 75))+ theme_classic()
+
+
+QR_p <- ggplot(Response_boxplot, aes(x=Study_group, y=QR)) + 
+  geom_boxplot() +
+  geom_signif(comparisons = list(c("Y1","YF"),c("Y1","PGT"),c("PGT","YF")), map_signif_level=TRUE, y_position = c(65,70, 75))+ theme_classic()
+
+
+LS_p <- ggplot(Response_boxplot, aes(x=Study_group, y=LS)) + 
+  geom_boxplot() +
+  geom_signif(comparisons = list(c("Y1","YF"),c("Y1","PGT"),c("PGT","YF")), map_signif_level=TRUE, y_position = c(65,70, 75))+ theme_classic()
+
+
+CL_p <- ggplot(Response_boxplot, aes(x=Study_group, y=CL)) + 
+  geom_boxplot() +
+  geom_signif(comparisons = list(c("Y1","YF"),c("Y1","PGT"),c("PGT","YF")), map_signif_level=TRUE, y_position = c(65,70, 75))+ theme_classic()
+
+
+SF_p <- ggplot(Response_boxplot, aes(x=Study_group, y=SF)) + 
+  geom_boxplot() +
+  geom_signif(comparisons = list(c("Y1","YF"),c("Y1","PGT"),c("PGT","YF")), map_signif_level=TRUE, y_position = c(65,70, 75))+ theme_classic()
+
+
+ET_p <- ggplot(Response_boxplot, aes(x=Study_group, y=ET)) + 
+  geom_boxplot() +
+  geom_signif(comparisons = list(c("Y1","YF"),c("Y1","PGT"),c("PGT","YF")), map_signif_level=TRUE, y_position = c(65,70, 75))+ theme_classic()
+
+
+QI_p <- ggplot(Response_boxplot, aes(x=Study_group, y=QI)) + 
+  geom_boxplot() +
+  geom_signif(comparisons = list(c("Y1","YF"),c("Y1","PGT"),c("PGT","YF")), map_signif_level=TRUE, y_position = c(65,70, 75))+ theme_classic()
+
+
+SE_p <- ggplot(Response_boxplot, aes(x=Study_group, y=SE)) + 
+  geom_boxplot() +
+  geom_signif(comparisons = list(c("Y1","YF"),c("Y1","PGT"),c("PGT","YF")), map_signif_level=TRUE, y_position = c(65,70, 75))+ theme_classic()
+
+```
+
+*Higher Order Learning* and *Reflective and Integrative Learning *
+
+```{r 1_1, echo=FALSE, warning=FALSE}
+HO_p+ RI_p
+
+```
+
+*Quantitative Reasoning* and *Learning Strategies*
+
+```{r 1, echo=FALSE, warning=FALSE}
+QR_p + LS_p
+
+```
+
+
+*Student-Faculty Interaction:* The extent to which students interact with academic staff and Effective Teaching Practices 
+
+```{r 3, echo=FALSE, warning=FALSE}
+SF_p  + ET_p 
+```
+
+*Quality of Interactions:* Students’ experience of supportive relationships with a range of other people on campus, thereby contributing to
+students’ ability to find assistance when needed and to learn from and with those around them.
+*Supportive Environment:* Students’ perceptions
+of how much their higher education institution emphasises services and activities that support their learning and development.
+
+```{r 4, echo=FALSE, warning=FALSE}
+QI_p + SE_p
+```
+
+
+*Collaborative Learning:* The extent to which students collaborate with peers to solve
+problems or to master difficult material,thereby deepening their understanding.
+
+```{r 2, echo=FALSE, warning=FALSE}
+CL_p  
+```
+
+
+## Course comparison
+
+Comparison of all indicators. All courses are loaded and the national average is set for comparison.
+
+```{r Course_comparison, echo=FALSE, fig.align="center", fig.height=7, fig.width=10, warning=FALSE}
+    Comparison<-RawData %>%
+        select("Year","coursecd","HO","RI","QR","LS","CL","SF","ET","QI","SE")%>%
+        group_by(coursecd)%>%
+        filter(Year == sort(unique(RawData$Year))[length(unique(RawData$Year))])%>%
+        summarise_all(funs(mean),na.rm = TRUE)%>%
+        select(-Year)%>%
+     # filter(!is.na(.))
+    #filter_at(vars(-coursecd), all_vars(!is.na(.)))%>%
+pivot_longer(-coursecd, names_to = "indicator", values_to = "avg") 
+
+    
+    
+    nat_avg<-RawData %>%
+        select("Year","coursecd","Nat_Avg_HO","Nat_Avg_RIL","Nat_Avg_QR","Nat_Avg_LS","Nat_Avg_Cl","Nat_Avg_SFI","Nat_Avg_ETP","Nat_Avg_QoI","Nat_Avg_SE")%>%
+        group_by(coursecd)%>%
+        filter(Year == sort(unique(RawData$Year))[length(unique(RawData$Year))])%>%
+        summarise_all(funs(mean),na.rm = TRUE)%>%
+        select(-Year)%>%
+        filter_at(vars(-coursecd), all_vars(!is.na(.)))%>%
+        pivot_longer(-coursecd, names_to = "indicator", values_to = "avg") 
+    
+    d1 <-cbind(Comparison, nat_avg)
+    names(d1)[4]<-"coursecode1"
+        names(d1)[5]<-"indicator_1"
+    names(d1)[6]<-"nat_avg"
+
+    # d1<- d1 %>% filter( !is.na(avg))  %>% filter( avg>3)
+
+    
+  a2<-ggplot(d1) +
+ geom_bar(position = "dodge",aes(x = coursecd, fill = coursecd, weight = avg)) +
+  geom_hline(aes(yintercept = nat_avg), )+
+ scale_fill_viridis_d(option = "viridis") +
+ theme_classic() +
+ facet_wrap(vars(indicator))+
+    theme(axis.title.x=element_blank(),
+          axis.title.y=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+  
+  ggplotly(a2)
+  
+
+```
+
+
+
+
+
+
+```{r change_over_time, echo=FALSE, fig.align="center", fig.height=7, fig.width=10, message=FALSE, warning=FALSE}
+
+stat_box_data <- function(y, upper_limit = max(iris$Sepal.Length) * 1.15) {
+  return( 
+    data.frame(
+      y = 0.95 * upper_limit,
+      label = paste('count =', length(y), '\n',
+                    'mean =', round(mean(y), 1), '\n')
+    )
+  )
+}
+
+    change<-RawData %>%
+        select("Year","coursecd","HO","RI","QR","LS","CL","SF","ET","QI","SE")%>%
+          mutate( Year= as.numeric(Year))%>%
+          #mutate(A1= HO+RI+QR+LS, A2=CL+SF+ET+QI+SE)%>%
+        group_by(coursecd,Year)%>%
+        #filter(Year == 2019)%>%
+      summarise_at(c("HO","RI","QR","LS","CL","SF","ET","QI","SE"), mean, na.rm = TRUE) %>%  #select(-Year)%>%
+        filter_at(vars(-coursecd), all_vars(!is.na(.)))%>%
+pivot_longer(-c(coursecd,Year), names_to = "indicator", values_to = "avg") 
+
+  Response_boxplot2<-RawData %>%
+        select("Year","Study_group","sex","coursecd","Hoapplyh",	"Hoanalyzeh",	"Hoevaluateh",	"Hoformh")%>%
+        filter( sex==c(1,2))%>%
+  filter_at(vars(-coursecd,sex,Year,Study_group), all_vars(!is.na(.)))%>%
+  pivot_longer(-c(coursecd,Year,Study_group,sex), names_to = "indicator", values_to = "avg") 
+
+  
+
+  
+  
+
+```
+
+## Deeper look into the Higher Order Learning Indicator
+
+```{r Density, echo=FALSE, fig.align="center", fig.height=7, fig.width=10, message=FALSE, warning=FALSE}
+
+  
+ggplot(Response_boxplot, aes(HO, fill = Study_group, colour = Study_group)) +
+  geom_density(alpha = 0.2, na.rm = TRUE) +
+# scale_fill_viridis_d(option = "viridis") +
+ labs(x = "", y = "Density", title = "Density of HIgher Order Indicator Scores") +
+ theme_classic()
+
+```
+
+
+
+
+```{r anim, echo=FALSE, fig.align="center", fig.height=7, fig.width=10, message=FALSE, warning=FALSE}
+
+##Uncoment this code to see example of an animation in the report. It takes longer to generate the report with the animation included
+
+
+# anim<-ggplot(Response_boxplot2) +
+#  aes(x = indicator, fill = indicator,y=avg, weight = avg) +
+#  geom_bar(stat = "summary_bin", fun = mean) +
+# scale_fill_brewer(palette = "BrBG")+
+# stat_summary(
+#     fun.data = stat_box_data, 
+#     geom = "text", 
+#     hjust = 0.5,
+#     vjust = 0.9
+#   )+
+#   theme_minimal()+
+# transition_states(as.factor(Year),
+#     transition_length = 2,
+#     state_length = 10) +
+#   enter_fade() + 
+#   exit_shrink() +
+#   ease_aes('sine-in-out')+
+#     labs(title = 'Year: {closest_state}', x = 'HO sub-questions', y = 'Average')
+# 
+# animate(anim, nframes = 300, end_pause = 100, rewind = TRUE)
+
+
+```
+
+
+
+
+
+
+------------------------------------
+
+## Qualitative responses
+
+
+```{r echo=FALSE, warning=FALSE}
+ qualt<-RawData %>%
+        select("Year","Study_group","sex","coursecd","op1_inss", "op2_inss")%>%
+       # filter(Survey=="ISSE2018")  %>% 
+        rename(Stu_Gr=Study_group)%>%
+          filter(!is.na(op1_inss))%>%
+        filter(!is.na(op2_inss))%>%
+        group_by(Year, coursecd)
+
+datatable(qualt, filter = 'top',caption = "Qualitative responses",rownames = FALSE,
+          extensions = 'Buttons', options = list(
+    dom = 'Bfrtip',
+    columnDefs = list(list(className = 'dt-center', targets = "_all")),
+    buttons = c('copy', 'csv', 'excel', 'pdf', 'print')
+  ))
+
+
+```
+
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+&nbsp;
+
+```{r text mining, fig.align="center", fig.height=5, fig.width=10, echo=FALSE, message=FALSE, warning=FALSE}
+
+
+tidy_text <- RawData %>%
+  select(op1_inss,QI, coursecd)%>%
+        filter( !is.na(op1_inss))%>%
+mutate(line = row_number())  %>%
+    unnest_tokens(word, op1_inss) %>%
+    anti_join(stop_words) 
+
+
+tidy_text2 <- RawData %>%
+  select(op2_inss,QI, coursecd) %>% 
+ filter( !is.na(op2_inss))%>%
+mutate(line = row_number())  %>%
+    unnest_tokens(word, op2_inss) %>%
+    anti_join(stop_words) 
+
+tidy_text_f <- rbind(tidy_text,tidy_text2)
+
+
+
+tidy_text %>% group_by(word,coursecd) %>% 
+          filter( !is.na(QI))%>%
+  summarise(avg_QI=mean(QI), nb_reviews=n(), ) %>% 
+  filter(nb_reviews>10) %>% 
+  arrange(desc(avg_QI)) %>% 
+  ggplot(aes(avg_QI, nb_reviews)) + 
+  geom_text(aes(label=word), vjust=1,hjust=1, check_overlap=T )+
+  geom_point(aes(colour=coursecd))+
+  xlim(20,50)+
+    labs(title="What words were associated with High and Low Quality of interaction Scores",
+subtitle="Only words appearing more than 10 times are counted. Displaying only 1st open ended question")+
+   theme_classic()
+
+
+
+
+
+```
+
+
+&nbsp;
+
+
+```{r topic modeling,fig.align="center", fig.height=5, fig.width=10, echo=FALSE, message=FALSE, warning=FALSE}
+
+
+user_matrix <-tidy_text_f%>% group_by(word) %>%
+          filter( !is.na(QI))%>%
+mutate(n=1) %>%
+  filter(n()>10) %>%
+  cast_sparse(coursecd, word,n)
+
+
+
+
+stm_from_oe1 <- stm(user_matrix,
+                    K = 4,
+                    verbose = F,
+                    init.type = "Spectral")
+
+
+tidy(stm_from_oe1) %>%
+  group_by(topic) %>%
+  filter( !is.na(term))%>%
+    filter( !is.na(beta))%>%
+    filter( !is.na(topic))%>%
+  top_n(7,beta) %>%
+  mutate(term=factor(reorder(term, beta))) %>%
+  ggplot(aes(beta,y=as.factor(reorder(term,beta))))+
+  geom_col(aes(fill=as.factor(topic)))+
+  scale_y_reordered()+
+  facet_wrap(~ topic, scales = "free_y")+
+   theme_classic()+
+  labs(title="Structural Topic Model (STM) of the open ended answers", subtitle = "Four topics were chosen based on the ROC curve of the data")
+
+
+# topic_model_gamma <-tidy(stm_from_oe1, matrix = "gamma") %>% 
+#   mutate(user_name=rownames(user_matrix)[document]) %>% 
+# group_by(topic) %>% 
+#   filter( !is.na(term))%>%
+#     filter( !is.na(beta))%>%
+#     filter( !is.na(topic))%>%
+#   top_n(7,beta) %>% 
+#   mutate(term=factor(reorder(term, beta))) %>% 
+#   ggplot(aes(beta,y=as.factor(reorder(term,beta))))+
+#   geom_col(aes(fill=as.factor(topic)))+
+#   scale_y_reordered()+
+#   facet_wrap(~ topic, scales = "free_y")
+
+# 
+# topic_model_gamma %>% 
+#   group_by(topic) %>% 
+#   top_n(1,gamma) 
+#   
+
+
+
+
+```
+
+```{r}
+#skim(RawData)
+```
+
+
+
+```{r echo=FALSE, fig.height=12, fig.width=12, message=FALSE, warning=FALSE}
+
+cor_dat <- RawData %>% select("Riintegrateh" ,         "Risocietalh"  ,         "Ridiverseh"    ,        "Riownviewh"   ,         "Riperspecth",          
+"Rinewviewh"   ,         "Riconnecth"   ,         "Qrconcludeh"   ,        "Qrproblemh"   ,         "Qrevaluateh",          
+"Lsreadingh"   ,         "Lsnotesh"     ,         "Lssummaryh"    ,        "Claskhelph"   ,         "Clexplainh" ,          
+"Clstudyh"     ,         "Clprojecth"   ,         "Sfcareerh"     ,        "Sfotherworkh" ,         "Sfdiscussh" ,          
+"Sfperformh"   ,         "ETgoalsh"     ,         "ETorganizeh"   ,        "ETexampleh"   ,         "ETdraftfbh" ,          
+"ETfeedbackh"  ,         "QIstudenth"   ,         "QIadvisorh"    ,        "QIfacultyh"   ,         "QIstaffh"   ,          
+"QIadminh"     ,         "SEacademich"  ,         "SElearnsuph"   ,        "SEdiverseh"   ,         "SEsocialh"  ,          
+"SEwellnessh"  ,         "SEnonacadh"   ,         "SEactivitiesh" ,        "SEeventsh") %>% 
+  drop_na()
+
+
+
+corr <- round(cor(cor_dat), 1)
+head(corr[, 1:6])
+p.mat <- cor_pmat(cor_dat)
+head(p.mat[, 1:4])
+a<-ggcorrplot(corr,
+     p.mat = p.mat,
+       hc.order = TRUE,
+  outline.color = "white",
+  ggtheme = ggplot2::theme_gray,
+  colors = c("#E46726", "white", "#6D9EC1"),
+  pch = 4, pch.col = "black", pch.cex =1,
+           tl.cex = 15,lab_size = 4.5)
+a
+
+```
+
+
+```{r echo=FALSE, fig.height=10, fig.width=10, message=FALSE, warning=FALSE}
+
+ggplotly(a)
+  
+densityHeatmap(scale(cor_dat))
+
+
+```
+
+
+
+
+
+
+
+```{r echo=FALSE, fig.height=15, fig.width=15, message=FALSE, warning=FALSE}
+
+
+cor_dat2 <- RawData %>% select("coursecd","Riintegrateh" ,         "Risocietalh"  ,         "Ridiverseh"    ,        "Riownviewh"   ,         "Riperspecth",          
+"Rinewviewh"   ,         "Riconnecth"   ,         "Qrconcludeh"   ,        "Qrproblemh"   ,         "Qrevaluateh",          
+"Lsreadingh"   ,         "Lsnotesh"     ,         "Lssummaryh"    ,        "Claskhelph"   ,         "Clexplainh" ,          
+"Clstudyh"     ,         "Clprojecth"   ,         "Sfcareerh"     ,        "Sfotherworkh" ,         "Sfdiscussh" ,          
+"Sfperformh"   ,         "ETgoalsh"     ,         "ETorganizeh"   ,        "ETexampleh"   ,         "ETdraftfbh" ,          
+"ETfeedbackh"  ,         "QIstudenth"   ,         "QIadvisorh"    ,        "QIfacultyh"   ,         "QIstaffh"   ,          
+"QIadminh"     ,         "SEacademich"  ,         "SElearnsuph"   ,        "SEdiverseh"   ,         "SEsocialh"  ,          
+"SEwellnessh"  ,         "SEnonacadh"   ,         "SEactivitiesh" ,        "SEeventsh") %>% 
+  drop_na() 
+
+
+aa<-cor_dat2 %>% 
+  group_by(coursecd) %>% 
+  summarise_all(funs(mean)) %>% 
+  pivot_longer(c("Riintegrateh" ,         "Risocietalh"  ,         "Ridiverseh"    ,        "Riownviewh"   ,         "Riperspecth",          
+"Rinewviewh"   ,         "Riconnecth"   ,         "Qrconcludeh"   ,        "Qrproblemh"   ,         "Qrevaluateh",          
+"Lsreadingh"   ,         "Lsnotesh"     ,         "Lssummaryh"    ,        "Claskhelph"   ,         "Clexplainh" ,          
+"Clstudyh"     ,         "Clprojecth"   ,         "Sfcareerh"     ,        "Sfotherworkh" ,         "Sfdiscussh" ,          
+"Sfperformh"   ,         "ETgoalsh"     ,         "ETorganizeh"   ,        "ETexampleh"   ,         "ETdraftfbh" ,          
+"ETfeedbackh"  ,         "QIstudenth"   ,         "QIadvisorh"    ,        "QIfacultyh"   ,         "QIstaffh"   ,          
+"QIadminh"     ,         "SEacademich"  ,         "SElearnsuph"   ,        "SEdiverseh"   ,         "SEsocialh"  ,          
+"SEwellnessh"  ,         "SEnonacadh"   ,         "SEactivitiesh" ,        "SEeventsh"), names_to = "code", values_to = "cases") 
+
+
+vv<-aa %>% bind_cols(g = group_indices(., code))
+
+
+
+names<-c("1" ,         "1"  ,         "1"    ,        "1"   ,         "1",          
+"1"   ,         "1"   ,         "2"   ,        "2"   ,         "2",          
+"3"   ,         "3"     ,         "3"    ,        "4"   ,         "4" ,          
+"4"     ,         "4"   ,         "5"     ,        "5" ,         "5" ,          
+"5"   ,         "6"     ,         "6"   ,        "6"   ,         "6" ,          
+"6"  ,         "7"   ,         "7"    ,        "7"   ,         "7"   ,          
+"7"     ,         "8"  ,         "8"   ,        "8"   ,         "8"  ,          
+"8"  ,         "8"   ,         "8" ,        "8")
+
+
+
+vv$gg<-rep_len(names, len= length(vv$code))
+
+
+ggplot(vv) +
+ aes(x = code, weight = cases) +
+ geom_bar(position = "dodge", fill = "#0c4c8a") +
+ coord_flip() +
+ theme_minimal() +
+ facet_wrap(vars(gg), scales = "free")
+
+```
+
+
+
+
+
+
