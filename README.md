@@ -7,7 +7,7 @@ Summary report for StudentSurveyIE
 
 
 
-To prepare the dataset, copy the Raw data from at least two reports into an <b>.CSV</b> file. Add a column <b>"Year"</b> to denote the year of the survey. The order of the variables does not matter. 
+To prepare the dataset, copy the Raw data from at least two reports into a <b>.CSV</b> file. Add a column <b>"Year"</b> to denote the year of the survey. The order of the variables does not matter. 
 
 
 
